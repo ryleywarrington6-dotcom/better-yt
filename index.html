@@ -1,3 +1,4 @@
+cat << 'EOF' > index.html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -192,31 +193,24 @@
             }
         }
 
-        function extractYouTubeId(inputStr) {
-            if (inputStr.length === 11) return inputStr;
+        // Complete regular expression fallback mechanism
+        function extractYouTubeId(url) {
+            if (url.length === 11) return url;
             
-            try {
-                let absoluteUrl = inputStr;
-                if (!absoluteUrl.startsWith('http://') && !absoluteUrl.startsWith('https://')) {
-                    absoluteUrl = 'https://' + absoluteUrl;
-                }
-                
-                const urlObj = new URL(absoluteUrl);
-                
-                if (urlObj.hostname === 'youtu.be') {
-                    return urlObj.pathname.substring(1);
-                }
-                
-                if (urlObj.pathname.startsWith('/shorts/')) {
-                    return urlObj.pathname.split('/')[2];
-                }
-                
-                return urlObj.searchParams.get('v');
-            } catch (e) {
-                const match = inputStr.match(/[a-zA-Z0-9_-]{11}/);
-                return match ? match[0] : null;
+            // Scans the string for the explicit 11-digit character sequence following standard separators
+            const regExp = /^.*(?:(?:youtu\.be\/|v\/|vi\/|u\/\w\/|embed\/|shorts\/)|(?:(?:watch)?\?v(?:i)?=|\&v(?:i)?=))([^#\&\?]*).*/;
+            const match = url.match(regExp);
+            
+            if (match && match[1] && match[1].length === 11) {
+                return match[1];
             }
+            
+            // Universal emergency parameter extraction rule
+            const fallbackReg = /[a-zA-Z0-9_-]{11}/;
+            const fallbackMatch = url.match(fallbackReg);
+            return fallbackMatch ? fallbackMatch[0] : null;
         }
     </script>
 </body>
 </html>
+EOF
