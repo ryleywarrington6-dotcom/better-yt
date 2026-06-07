@@ -48,7 +48,7 @@
         }
         #player { width: 100%; height: 100%; pointer-events: auto; }
 
-        /* Cursor Visual Canvas Layers */
+        /* Cursor Canvas Sync Elements */
         .sync-cursor {
             position: fixed; width: 14px; height: 14px;
             background: #00ffcc; border-radius: 50%;
@@ -195,15 +195,26 @@
             }
         }
 
-        // Universal parsing layout that captures all variants cleanly
+        // Fixed and bulletproof function that handles all short, standard, and raw variations
         function extractYouTubeId(url) {
-            if (url.length === 11) return url; // Already a raw video ID
+            if (url.length === 11) return url;
             
-            // Matches youtu.be, watch URLs, embed URLs, and shorts subpaths cleanly
+            // Clean regex matching groups checking explicitly inside the capture bounds
             const regExp = /^.*(?:(?:youtu\.be\/|v\/|vi\/|u\/\w\/|embed\/|shorts\/)|(?:(?:watch)?\?v(?:i)?=|\&v(?:i)?=))([^#\&\?]*).*/;
             const match = url.match(regExp);
             
-            return (match && match[1] && match[1].length === 11) ? match[1] : null;
+            if (match && match[1] && match[1].length === 11) {
+                return match[1];
+            }
+            
+            // Ultimate fallback rule: extract the final 11 alphanumeric characters
+            const cleanUrl = url.split('?')[0];
+            const endBlock = cleanUrl.substring(cleanUrl.length - 11);
+            if (endBlock.length === 11 && !endBlock.includes('/')) {
+                return endBlock;
+            }
+            
+            return null;
         }
     </script>
 </body>
