@@ -48,7 +48,7 @@
         }
         #player { width: 100%; height: 100%; pointer-events: auto; }
 
-        /* Cursor Canvas Layer Metrics */
+        /* Cursor Visual Canvas Layers */
         .sync-cursor {
             position: fixed; width: 14px; height: 14px;
             background: #00ffcc; border-radius: 50%;
@@ -93,7 +93,7 @@
         <div class="dashboard-nav">
             <h2 id="roomDisplayLabel" style="margin: 0; font-size: 20px; color: #aaa;">Room: --</h2>
             <div class="stream-input-group">
-                <input type="text" id="videoUrlField" placeholder="Paste full youtube.com or short youtu.be link">
+                <input type="text" id="videoUrlField" placeholder="Paste full youtube.com, short youtu.be, shorts, or raw ID">
                 <button onclick="broadcastNewMedia()">Load Video</button>
             </div>
         </div>
@@ -195,11 +195,15 @@
             }
         }
 
+        // Universal parsing layout that captures all variants cleanly
         function extractYouTubeId(url) {
-            // Updated extraction regex to parse both standard watch and youtu.be short links accurately
-            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            if (url.length === 11) return url; // Already a raw video ID
+            
+            // Matches youtu.be, watch URLs, embed URLs, and shorts subpaths cleanly
+            const regExp = /^.*(?:(?:youtu\.be\/|v\/|vi\/|u\/\w\/|embed\/|shorts\/)|(?:(?:watch)?\?v(?:i)?=|\&v(?:i)?=))([^#\&\?]*).*/;
             const match = url.match(regExp);
-            return (match && match[2].length === 11) ? match[2] : url;
+            
+            return (match && match[1] && match[1].length === 11) ? match[1] : null;
         }
     </script>
 </body>
