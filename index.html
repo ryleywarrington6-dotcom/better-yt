@@ -3,80 +3,179 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Better YT - Watch Together</title>
+    <title>Better YT - Co-Watching Workspace</title>
+    <script src="https://socket.io"></script>
     <style>
         body {
-            margin: 0;
-            padding: 20px;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            text-align: center;
-            background: #1a1a1a;
-            color: #fff;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            margin: 0; padding: 0;
+            font-family: system-ui, sans-serif;
+            background: #121212; color: #fff;
+            min-height: 100vh; overflow-x: hidden;
         }
-        .container {
-            max-width: 800px;
-            width: 100%;
+        #lobby {
+            display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh;
         }
-        .controls {
-            margin: 20px 0;
+        .card {
+            background: #1e1e1e; padding: 40px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); text-align: center;
         }
         input {
-            padding: 12px;
-            font-size: 16px;
-            margin-right: 10px;
-            border-radius: 6px;
-            border: 1px solid #444;
-            background: #2a2a2a;
-            color: #fff;
-            width: 200px;
+            padding: 12px; font-size: 16px; border-radius: 6px; border: 1px solid #333; background: #252525; color: #fff; margin: 10px; width: 220px; text-transform: uppercase;
         }
         button {
-            padding: 12px 24px;
-            font-size: 16px;
-            border-radius: 6px;
-            border: none;
-            background: #0070f3;
-            color: #fff;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background 0.2s;
+            padding: 12px 24px; font-size: 16px; border-radius: 6px; border: none; background: #ff0000; color: #fff; font-weight: bold; cursor: pointer;
         }
-        button:hover {
-            background: #0051a8;
+        #room-view { display: none; padding: 20px; }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .player-container { position: relative; width: 100%; max-width: 900px; margin: 0 auto; aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; }
+        iframe { width: 100%; height: 100%; border: none; }
+        
+        /* Cursor Synchronization Layer */
+        .fake-cursor {
+            position: fixed; width: 12px; height: 12px;
+            background: #00e5ff; border-radius: 50%;
+            pointer-events: none; transform: translate(-5%, -5%);
+            z-index: 99999; transition: transform 0.05s linear;
         }
-        video {
-            width: 100%;
-            border-radius: 12px;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.7);
-            background: #000;
+        .cursor-label {
+            position: absolute; top: 15px; left: 10px;
+            background: rgba(0,0,0,0.75); color: #fff;
+            font-size: 11px; padding: 2px 6px; border-radius: 3px; white-space: nowrap;
+        }
+        .click-pulse {
+            position: fixed; width: 30px; height: 30px;
+            border: 2px solid #00e5ff; border-radius: 50%;
+            pointer-events: none; z-index: 99998;
+            transform: translate(-35%, -35%); animation: pulseOut 0.4s ease-out forwards;
+        }
+        @keyframes pulseOut {
+            0% { transform: scale(0.5); opacity: 1; }
+            100% { transform: scale(1.8); opacity: 0; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🍿 Better YT — Watch Together</h1>
-        <div class="controls">
-            <input type="text" id="roomInput" placeholder="Enter Room Code">
-            <button onclick="joinRoom()">Join Room</button>
+
+    <!-- LOBBY DISPLAY LAYER -->
+    <div id="lobby">
+        <div class="card">
+            <h1>🍿 Better YT</h1>
+            <p>Enter an alphanumeric code to spin up or join a shared session</p>
+            <input type="text" id="roomCodeInput" placeholder="ROOM CODE (E.G. AB12)" maxlength="8">
+            <br>
+            <button onclick="connectToSession()">Launch Session</button>
         </div>
-        <video id="videoPlayer" controls src="https://w3schools.com"></video>
+    </div>
+
+    <!-- MAIN CO-WATCH ROOM WORKSPACE -->
+    <div id="room-view">
+        <div class="header-bar">
+            <h3 id="roomDisplay">Room: --</h3>
+            <div>
+                <input type="text" id="ytUrlInput" placeholder="Paste YouTube Link or Video ID" style="width: 350px;">
+                <button onclick="loadRequestedVideo()" style="background: #222; border: 1px solid #444;">Load Video</button>
+            </div>
+        </div>
+        <div class="player-container">
+            <div id="player"></div>
+        </div>
     </div>
 
     <script>
-        function joinRoom() {
-            const room = document.getElementById('roomInput').value;
-            if (room) {
-                alert('Joining room: ' + room);
-                console.log('Room session connected via code:', room);
-            } else {
-                alert('Please enter a room code first.');
+        let socket;
+        let player;
+        let currentRoom = "";
+        let userId = "User_" + Math.floor(Math.random() * 1000);
+
+        // Standardize connection strings case-insensitively
+        function connectToSession() {
+            let inputCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+            if(!inputCode.match(/^[A-Z0-9]+$/)) {
+                alert("Please restrict your workspace codes to letters and numbers only.");
+                return;
+            }
+            currentRoom = inputCode;
+            document.getElementById('lobby').style.display = 'none';
+            document.getElementById('room-view').style.display = 'block';
+            document.getElementById('roomDisplay').innerText = "Active Sync Room: " + currentRoom;
+
+            // Connect WebSocket engine directly to your active backend deployment infrastructure
+            setupSyncSocket();
+        }
+
+        function setupSyncSocket() {
+            // Replace with your live Render backend URL once deployed
+            socket = io("https://onrender.com");
+
+            socket.emit('join-room', { room: currentRoom, user: userId });
+
+            // Tracking cursor data pipelines
+            window.addEventListener('mousemove', (e) => {
+                socket.emit('cursor-move', {
+                    room: currentRoom, user: userId,
+                    x: e.clientX / window.innerWidth,
+                    y: e.clientY / window.innerHeight
+                });
+            });
+
+            window.addEventListener('click', (e) => {
+                socket.emit('cursor-click', {
+                    room: currentRoom,
+                    x: e.clientX, y: e.clientY
+                });
+            });
+
+            // Catch remote interactions
+            socket.on('user-moved', (data) => {
+                if(data.user === userId) return;
+                let cursor = document.getElementById(`cursor-${data.user}`);
+                if(!cursor) {
+                    cursor = document.createElement('div');
+                    cursor.id = `cursor-${data.user}`;
+                    cursor.className = 'fake-cursor';
+                    cursor.innerHTML = `<span class="cursor-label">${data.user}</span>`;
+                    document.body.appendChild(cursor);
+                }
+                cursor.style.left = (data.x * window.innerWidth) + 'px';
+                cursor.style.top = (data.y * window.innerHeight) + 'px';
+            });
+
+            socket.on('user-clicked', (data) => {
+                let pulse = document.createElement('div');
+                pulse.className = 'click-pulse';
+                pulse.style.left = data.x + 'px';
+                pulse.style.top = data.y + 'px';
+                document.body.appendChild(pulse);
+                setTimeout(() => pulse.remove(), 400);
+            });
+        }
+
+        // Initialize embedded YouTube framing API infrastructure
+        let tag = document.createElement('script');
+        tag.src = "https://youtube.com";
+        let firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('player', {
+                videoId: 'mov_bbb', // default test tracking item
+                events: { 'onStateChange': handlePlayerStateChange }
+            });
+        }
+
+        function loadRequestedVideo() {
+            let rawUrl = document.getElementById('ytUrlInput').value;
+            let regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            let match = rawUrl.match(regExp);
+            let videoId = (match && match[2].length == 11) ? match[2] : rawUrl;
+            
+            if(player && videoId) {
+                player.loadVideoById(videoId);
             }
         }
-        console.log("Better YT streaming application initialized successfully.");
+
+        function handlePlayerStateChange(event) {
+            // Emits playback state values across the signaling sockets here for global frame tracking
+        }
     </script>
 </body>
 </html>
