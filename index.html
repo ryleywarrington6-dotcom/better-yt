@@ -48,7 +48,6 @@
         }
         #player { width: 100%; height: 100%; pointer-events: auto; }
 
-        /* Cursor Canvas Sync Elements */
         .sync-cursor {
             position: fixed; width: 14px; height: 14px;
             background: #00ffcc; border-radius: 50%;
@@ -78,7 +77,6 @@
 </head>
 <body>
 
-    <!-- LOBBY SCREEN -->
     <div id="lobby">
         <div class="lobby-card">
             <h1 style="margin: 0 0 10px 0; color: #ff0000; font-size: 36px;">🍿 Better YT</h1>
@@ -88,12 +86,11 @@
         </div>
     </div>
 
-    <!-- MAIN APP SCREEN -->
     <div id="room-view">
         <div class="dashboard-nav">
             <h2 id="roomDisplayLabel" style="margin: 0; font-size: 20px; color: #aaa;">Room: --</h2>
             <div class="stream-input-group">
-                <input type="text" id="videoUrlField" placeholder="Paste full youtube.com, short youtu.be, shorts, or raw ID">
+                <input type="text" id="videoUrlField" placeholder="Paste full link, short link, or video ID">
                 <button onclick="broadcastNewMedia()">Load Video</button>
             </div>
         </div>
@@ -111,7 +108,7 @@
         function joinSyncSession() {
             let code = document.getElementById('roomCodeField').value.trim().toUpperCase();
             if (!code.match(/^[A-Z0-9]+$/)) {
-                alert("Please enforce standard alphanumeric limits (Letters and numbers only).");
+                alert("Please use letters and numbers only.");
                 return;
             }
             currentRoomId = code;
@@ -195,26 +192,30 @@
             }
         }
 
-        // Fixed and bulletproof function that handles all short, standard, and raw variations
-        function extractYouTubeId(url) {
-            if (url.length === 11) return url;
+        function extractYouTubeId(inputStr) {
+            if (inputStr.length === 11) return inputStr;
             
-            // Clean regex matching groups checking explicitly inside the capture bounds
-            const regExp = /^.*(?:(?:youtu\.be\/|v\/|vi\/|u\/\w\/|embed\/|shorts\/)|(?:(?:watch)?\?v(?:i)?=|\&v(?:i)?=))([^#\&\?]*).*/;
-            const match = url.match(regExp);
-            
-            if (match && match[1] && match[1].length === 11) {
-                return match[1];
+            try {
+                let absoluteUrl = inputStr;
+                if (!absoluteUrl.startsWith('http://') && !absoluteUrl.startsWith('https://')) {
+                    absoluteUrl = 'https://' + absoluteUrl;
+                }
+                
+                const urlObj = new URL(absoluteUrl);
+                
+                if (urlObj.hostname === 'youtu.be') {
+                    return urlObj.pathname.substring(1);
+                }
+                
+                if (urlObj.pathname.startsWith('/shorts/')) {
+                    return urlObj.pathname.split('/')[2];
+                }
+                
+                return urlObj.searchParams.get('v');
+            } catch (e) {
+                const match = inputStr.match(/[a-zA-Z0-9_-]{11}/);
+                return match ? match[0] : null;
             }
-            
-            // Ultimate fallback rule: extract the final 11 alphanumeric characters
-            const cleanUrl = url.split('?')[0];
-            const endBlock = cleanUrl.substring(cleanUrl.length - 11);
-            if (endBlock.length === 11 && !endBlock.includes('/')) {
-                return endBlock;
-            }
-            
-            return null;
         }
     </script>
 </body>
